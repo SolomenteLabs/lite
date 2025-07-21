@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SoloMint CSP-Safe</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      padding: 2rem;
+      background: #f8f9fa;
+    }
+    button {
+      background: black;
+      color: white;
+      padding: 1rem 2rem;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 1.1rem;
+      margin-top: 2rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>🔐 Mint Soulbound Token (No CSP Issues)</h1>
+  <p>Mint a 30-day smart token using native Keplr + Coreum testnet.</p>
+  <button id="mint">Mint Smart Token</button>
+
+  <script>
+    const CHAIN_ID = "coreum-testnet-1";
+    const REST = "https://rest.coreum.dev";
+    const RPC = "https://full-node.testnet-1.coreum.dev:26657";
+    const EXPIRATION = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
+
+    const tokenMsg = {
+      type: "coreum/asset/ft/v1/MsgIssueToken",
+      value: {
+        name: "SoloPass",
+        symbol: "SOLOPASS",
+        subunit: "solopass",
+        decimals: 0,
+        initial_amount: "1",
+        description: "Soulbound 30-day token",
+        features: ["burning", "disable_sending"],
+        burn_rate: "0.0",
+        send_commission_rate: "0.0",
+        uri: "",
+        uri_hash: "",
+        extension: {
+          max_supply: "1",
+          non_transferable: true,
+          cancel_autorenew: true,
+          expiry_timestamp: EXPIRATION.toString()
+        }
+      }
+    };
+
+    document.getElementById("mint").addEventListener("click", async () => {
+      if (!window.keplr) {
+        alert("❌ Keplr not installed.");
+        return;
+      }
+
+      try {
+        await window.keplr.enable(CHAIN_ID);
+        const offlineSigner = window.getOfflineSigner(CHAIN_ID);
+        const accounts = await offlineSigner.getAccounts();
+        const address = accounts[0].address;
+
+        const msg = {
+          typeUrl: "/coreum.asset.ft.v1.MsgIssueToken",
+          value: {
+            issuer: address,
+            ...tokenMsg.value
+          }
+        };
+
+        const fee = {
+          amount: [{ denom: "utestcore", amount: "1000000" }],
+          gas: "400000"
+        };
+
+        const txBody = {
+          messages: [msg],
+          memo: "",
+          timeoutHeight: "0",
+          extensionOptions: [],
+          nonCriticalExtensionOptions: [],
+        };
+
+        const authInfo = {
+          signerInfos: [],
+          fee,
+        };
+
+        const tx = {
+          body: txBody,
+          authInfo,
+          signatures: [],
+        };
+
+        const aminoMsg = {
+          msgs: [msg],
+          fee,
+          chain_id: CHAIN_ID,
+          memo: "",
+          account_number: "0", // will be replaced
+          sequence: "0",       // will be replaced
+        };
+
+        const client = await fetch(`${REST}/cosmos/auth/v1beta1/accounts/${address}`);
+        const data = await client.json();
+        const baseAccount = data.account.base_account || data.account;
+
+        aminoMsg.account_number = baseAccount.account_number;
+        aminoMsg.sequence = baseAccount.sequence;
+
+        const signResult = await window.keplr.signAmino(CHAIN_ID, address, {
+          msgs: aminoMsg.msgs,
+          fee: aminoMsg.fee,
+          memo: aminoMsg.memo,
+          chain_id: CHAIN_ID,
+          account_number: aminoMsg.account_number,
+          sequence: aminoMsg.sequence
+        });
+
+        const signedTx = {
+          tx: {
+            msg: aminoMsg.msgs,
+            fee: aminoMsg.fee,
+            signatures: [signResult.signature.signature],
+            memo: aminoMsg.memo,
+          },
+          mode: "BROADCAST_MODE_SYNC"
+        };
+
+        const broadcast = await fetch(`${REST}/cosmos/tx/v1beta1/txs`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(signedTx)
+        });
+
+        const broadcastResult = await broadcast.json();
+
+        if (broadcastResult.tx_response && broadcastResult.tx_response.code === 0) {
+          alert("✅ Minted! TX: " + broadcastResult.tx_response.txhash);
+        } else {
+          console.error(broadcastResult);
+          alert("❌ Broadcast failed.");
+        }
+      } catch (err) {
+        console.error("Mint error:", err);
+        alert("❌ " + (err.message || err));
+      }
+    });
+  </script>
+</body>
+</html>
