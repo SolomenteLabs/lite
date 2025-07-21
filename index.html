@@ -1,161 +1,160 @@
+cat > index.html << 'EOF'
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SoloMint CSP-Safe</title>
+  <title>SoloMint Terminal</title>
   <style>
     body {
-      font-family: sans-serif;
-      text-align: center;
+      font-family: monospace;
+      background: #111;
+      color: #0f0;
       padding: 2rem;
-      background: #f8f9fa;
+      max-width: 700px;
+      margin: auto;
     }
     button {
-      background: black;
-      color: white;
-      padding: 1rem 2rem;
+      background: #0f0;
+      color: #000;
       border: none;
+      padding: 1rem 2rem;
+      font-weight: bold;
       border-radius: 8px;
       cursor: pointer;
-      font-size: 1.1rem;
-      margin-top: 2rem;
+      margin-bottom: 2rem;
+    }
+    #log {
+      background: #000;
+      padding: 1rem;
+      border: 1px solid #0f0;
+      height: 400px;
+      overflow-y: auto;
+      white-space: pre-wrap;
     }
   </style>
 </head>
 <body>
-  <h1>🔐 Mint Soulbound Token (No CSP Issues)</h1>
-  <p>Mint a 30-day smart token using native Keplr + Coreum testnet.</p>
+  <h1>🚀 Mint Soulbound Token (Live Log)</h1>
   <button id="mint">Mint Smart Token</button>
+  <div id="log">Ready.\n</div>
 
   <script>
-    const CHAIN_ID = "coreum-testnet-1";
-    const REST = "https://full-node.testnet-1.coreum.dev:1317
-    const RPC = "https://full-node.testnet-1.coreum.dev:26657";
-    const EXPIRATION = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
+    const logDiv = document.getElementById("log");
+    function log(step, emoji, message) {
+      const line = \`[${step}] ${emoji} ${message}\\n\`;
+      logDiv.textContent += line;
+      logDiv.scrollTop = logDiv.scrollHeight;
+      console.log(line.trim());
+    }
 
-    const tokenMsg = {
-      type: "coreum/asset/ft/v1/MsgIssueToken",
-      value: {
-        name: "SoloPass",
-        symbol: "SOLOPASS",
-        subunit: "solopass",
-        decimals: 0,
-        initial_amount: "1",
-        description: "Soulbound 30-day token",
-        features: ["burning", "disable_sending"],
-        burn_rate: "0.0",
-        send_commission_rate: "0.0",
-        uri: "",
-        uri_hash: "",
-        extension: {
-          max_supply: "1",
-          non_transferable: true,
-          cancel_autorenew: true,
-          expiry_timestamp: EXPIRATION.toString()
-        }
-      }
-    };
+    document.getElementById("mint").addEventListener("click", mintToken);
 
-    document.getElementById("mint").addEventListener("click", async () => {
+    async function mintToken() {
+      log("1", "🔘", "Mint button clicked");
+
       if (!window.keplr) {
-        alert("❌ Keplr not installed.");
+        log("2", "❌", "Keplr not detected");
+        alert("Install Keplr");
         return;
       }
 
+      log("2", "✅", "Keplr detected");
+
       try {
+        const CHAIN_ID = "coreum-testnet-1";
+        const REST = "https://full-node.testnet-1.coreum.dev:1317";
+        const RPC = "https://full-node.testnet-1.coreum.dev:26657";
+        const EXPIRATION = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
+
+        log("3", "🌐", "Enabling Keplr...");
         await window.keplr.enable(CHAIN_ID);
+        log("4", "✅", "Keplr enabled");
+
         const offlineSigner = window.getOfflineSigner(CHAIN_ID);
         const accounts = await offlineSigner.getAccounts();
         const address = accounts[0].address;
+        log("5", "🔑", \`Wallet: \${address}\`);
 
-        const msg = {
-          typeUrl: "/coreum.asset.ft.v1.MsgIssueToken",
+        log("6", "📡", "Fetching account info...");
+        const res = await fetch(\`\${REST}/cosmos/auth/v1beta1/accounts/\${address}\`);
+        const data = await res.json();
+        const acct = data.account.base_account || data.account;
+        log("6.1", "📘", \`Account #: \${acct.account_number}\`);
+        log("6.2", "📗", \`Sequence #: \${acct.sequence}\`);
+
+        log("7", "📦", "Building MsgIssueToken...");
+
+        const tokenMsg = {
+          type: "coreum/asset/ft/v1/MsgIssueToken",
           value: {
             issuer: address,
-            ...tokenMsg.value
+            name: "SoloPass",
+            symbol: "SOLOPASS",
+            subunit: "solopass",
+            decimals: 0,
+            initial_amount: "1",
+            description: "Soulbound 30-day token",
+            features: ["burning", "disable_sending"],
+            burn_rate: "0.0",
+            send_commission_rate: "0.0",
+            uri: "",
+            uri_hash: "",
+            extension: {
+              max_supply: "1",
+              non_transferable: true,
+              cancel_autorenew: true,
+              expiry_timestamp: EXPIRATION.toString()
+            }
           }
         };
 
-        const fee = {
-          amount: [{ denom: "utestcore", amount: "1000000" }],
-          gas: "400000"
-        };
-
-        const txBody = {
-          messages: [msg],
+        const amino = {
+          msgs: [tokenMsg],
+          fee: {
+            amount: [{ denom: "utestcore", amount: "1000000" }],
+            gas: "400000"
+          },
+          chain_id: CHAIN_ID,
           memo: "",
-          timeoutHeight: "0",
-          extensionOptions: [],
-          nonCriticalExtensionOptions: [],
+          account_number: acct.account_number,
+          sequence: acct.sequence
         };
 
-        const authInfo = {
-          signerInfos: [],
-          fee,
-        };
+        log("8", "✍️", "Requesting signature...");
+        const signed = await window.keplr.signAmino(CHAIN_ID, address, amino);
 
+        log("9", "📤", "Broadcasting TX...");
         const tx = {
-          body: txBody,
-          authInfo,
-          signatures: [],
-        };
-
-        const aminoMsg = {
-          msgs: [msg],
-          fee,
-          chain_id: CHAIN_ID,
-          memo: "",
-          account_number: "0", // will be replaced
-          sequence: "0",       // will be replaced
-        };
-
-        const client = await fetch(`${REST}/cosmos/auth/v1beta1/accounts/${address}`);
-        const data = await client.json();
-        const baseAccount = data.account.base_account || data.account;
-
-        aminoMsg.account_number = baseAccount.account_number;
-        aminoMsg.sequence = baseAccount.sequence;
-
-        const signResult = await window.keplr.signAmino(CHAIN_ID, address, {
-          msgs: aminoMsg.msgs,
-          fee: aminoMsg.fee,
-          memo: aminoMsg.memo,
-          chain_id: CHAIN_ID,
-          account_number: aminoMsg.account_number,
-          sequence: aminoMsg.sequence
-        });
-
-        const signedTx = {
           tx: {
-            msg: aminoMsg.msgs,
-            fee: aminoMsg.fee,
-            signatures: [signResult.signature.signature],
-            memo: aminoMsg.memo,
+            msg: amino.msgs,
+            fee: amino.fee,
+            signatures: [signed.signature.signature],
+            memo: amino.memo
           },
           mode: "BROADCAST_MODE_SYNC"
         };
 
-        const broadcast = await fetch(`${REST}/cosmos/tx/v1beta1/txs`, {
+        const broadcast = await fetch(\`\${REST}/cosmos/tx/v1beta1/txs\`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(signedTx)
+          body: JSON.stringify(tx)
         });
 
-        const broadcastResult = await broadcast.json();
-
-        if (broadcastResult.tx_response && broadcastResult.tx_response.code === 0) {
-          alert("✅ Minted! TX: " + broadcastResult.tx_response.txhash);
+        const result = await broadcast.json();
+        if (result.tx_response && result.tx_response.code === 0) {
+          log("10", "✅", \`Minted! TX Hash: \${result.tx_response.txhash}\`);
         } else {
-          console.error(broadcastResult);
-          alert("❌ Broadcast failed.");
+          log("10", "❌", "Broadcast failed.");
+          console.log(result);
         }
       } catch (err) {
-        console.error("Mint error:", err);
-        alert("❌ " + (err.message || err));
+        log("ERR", "❌", err.message || err);
       }
-    });
+    }
   </script>
 </body>
 </html>
+EOF
+
