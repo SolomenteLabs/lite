@@ -8,5 +8,8 @@
   },
   "devDependencies": {
     "vite": "^5.0.0"
+  },
+  "dependencies": {
+    "@cosmjs/stargate": "^0.34.0"
   }
 }

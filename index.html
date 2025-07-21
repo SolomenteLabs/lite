@@ -16,13 +16,11 @@
         margin: 0;
         padding-top: 3rem;
       }
-
       h1 {
         font-size: 1.75rem;
         color: #0f0;
         margin-bottom: 0.5rem;
       }
-
       button {
         background-color: #0f0;
         color: black;
@@ -34,7 +32,6 @@
         cursor: pointer;
         margin-bottom: 1rem;
       }
-
       #terminal {
         background-color: black;
         color: #0f0;
@@ -45,7 +42,6 @@
         overflow-y: auto;
         white-space: pre-wrap;
       }
-
       .title {
         display: flex;
         align-items: center;
@@ -53,68 +49,6 @@
         margin-bottom: 1rem;
       }
     </style>
-    <script type="module">
-      const terminal = document.getElementById("terminal");
-      const appendLog = (msg) => {
-        terminal.textContent += msg + "\\n";
-        terminal.scrollTop = terminal.scrollHeight;
-      };
-
-      appendLog("Ready.");
-
-      document.getElementById("mintBtn").addEventListener("click", async () => {
-        appendLog("🔍 Connecting to wallet...");
-        if (!window.keplr) {
-          appendLog("❌ Keplr not found. Please install Keplr.");
-          return;
-        }
-
-        const chainId = "coreum-testnet-1";
-        try {
-          await window.keplr.enable(chainId);
-          const offlineSigner = window.getOfflineSigner(chainId);
-          const accounts = await offlineSigner.getAccounts();
-          const address = accounts[0].address;
-          appendLog(`🔑 Wallet connected: ${address}`);
-
-          const msgIssue = {
-            typeUrl: "/coreum.asset.ft.v1.MsgIssue",
-            value: {
-              issuer: address,
-              symbol: "PASS",
-              subunit: "upass",
-              precision: 0,
-              initialAmount: "1",
-              description: "SoloPass Demo Token",
-              features: ["burning", "freezing", "whitelisting"],
-              burnRate: "0.0",
-              sendCommissionRate: "0.0",
-            },
-          };
-
-          const fee = {
-            amount: [{ denom: "utestcore", amount: "5000" }],
-            gas: "200000",
-          };
-
-          const { SigningStargateClient } = await import("@cosmjs/stargate");
-          const client = await SigningStargateClient.connectWithSigner(
-            "https://full-node.testnet-1.coreum.dev:26657",
-            offlineSigner
-          );
-
-          appendLog("🚀 Broadcasting mint transaction...");
-          const result = await client.signAndBroadcast(address, [msgIssue], fee);
-          if (result.code === 0) {
-            appendLog("✅ Mint successful!");
-          } else {
-            appendLog("❌ Mint failed: " + result.rawLog);
-          }
-        } catch (err) {
-          appendLog("⚠️ Error: " + err.message);
-        }
-      });
-    </script>
   </head>
   <body>
     <div class="title">
@@ -123,5 +57,6 @@
     </div>
     <button id="mintBtn">Mint Smart Token</button>
     <div id="terminal"></div>
+    <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
