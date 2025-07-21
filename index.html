@@ -41,6 +41,8 @@
 
   <script>
     const logDiv = document.getElementById("log");
+console.log("📦 SCRIPT LOADED");
+logDiv.textContent += "[0] 📦 Script loaded\n";
     function log(step, emoji, message) {
       const line = \`[${step}] ${emoji} ${message}\\n\`;
       logDiv.textContent += line;
